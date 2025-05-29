@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/services.dart';
 import '../services/auth_service.dart'; // Importar AuthService
-import 'login_view.dart';            // Importar LoginView para el logout
+import 'login_view.dart'; // Importar LoginView para el logout
 import '../widgets/barra_lateral.dart';
 import 'camara_en_vivo_view.dart';
 import 'clips_view.dart';
@@ -36,8 +36,13 @@ class _HomePageState extends State<HomePage> {
   void _initFCM() async {
     FirebaseMessaging messaging = FirebaseMessaging.instance;
     NotificationSettings settings = await messaging.requestPermission(
-      alert: true, announcement: false, badge: true, carPlay: false,
-      criticalAlert: false, provisional: false, sound: true,
+      alert: true,
+      announcement: false,
+      badge: true,
+      carPlay: false,
+      criticalAlert: false,
+      provisional: false,
+      sound: true,
     );
     if (settings.authorizationStatus == AuthorizationStatus.authorized) {
       String? token = await messaging.getToken();
@@ -50,9 +55,13 @@ class _HomePageState extends State<HomePage> {
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
       if (message.notification != null) {
         if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Notificación: ${message.notification?.title ?? ""}')),
-            );
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Notificación: ${message.notification?.title ?? ""}',
+              ),
+            ),
+          );
         }
       }
     });
@@ -60,7 +69,7 @@ class _HomePageState extends State<HomePage> {
       print('Message opened app from notification: ${message.data}');
     });
   }
-  
+
   // Lista de widgets se expande
   List<Widget> _buildWidgetOptions() => <Widget>[
     CamaraEnVivoView(
@@ -69,38 +78,51 @@ class _HomePageState extends State<HomePage> {
       // authService: widget.authService, // Pasar si CamaraEnVivoView lo necesita
     ),
     const ClipsView(), // Asumimos que ClipsView no necesita authService directamente
-    ContactosEmergenciaView(authService: widget.authService), // Pasar authService
+    ContactosEmergenciaView(
+      authService: widget.authService,
+    ), // Pasar authService
   ];
 
-
   void _handleFullScreenToggle(bool isFullScreen) {
-     if(_isFullScreenVideo != isFullScreen){
-        setState(() { _isFullScreenVideo = isFullScreen; });
-        if (isFullScreen) {
-          SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-          SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeRight, DeviceOrientation.landscapeLeft]);
-        } else {
-          SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-          SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-        }
-     }
+    if (_isFullScreenVideo != isFullScreen) {
+      setState(() {
+        _isFullScreenVideo = isFullScreen;
+      });
+      if (isFullScreen) {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+        SystemChrome.setPreferredOrientations([
+          DeviceOrientation.landscapeRight,
+          DeviceOrientation.landscapeLeft,
+        ]);
+      } else {
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+        SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+      }
+    }
   }
 
   void _onSelectItem(int index) {
-     if (_isFullScreenVideo && index != 0) { // Solo salir de fullscreen si no es la vista de cámara
-       _handleFullScreenToggle(false);
-     }
-    if (index != _selectedIndex) {
-      setState(() { _selectedIndex = index; });
+    if (_isFullScreenVideo && index != 0) {
+      // Solo salir de fullscreen si no es la vista de cámara
+      _handleFullScreenToggle(false);
     }
-    if (Navigator.of(context).canPop()) { Navigator.of(context).pop(); }
+    if (index != _selectedIndex) {
+      setState(() {
+        _selectedIndex = index;
+      });
+    }
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
   }
 
   void _logout() async {
     await widget.authService.logout();
     if (mounted) {
       Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => LoginView(authService: widget.authService)),
+        MaterialPageRoute(
+          builder: (context) => LoginView(authService: widget.authService),
+        ),
         (Route<dynamic> route) => false,
       );
     }
@@ -109,18 +131,27 @@ class _HomePageState extends State<HomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: _isFullScreenVideo && _selectedIndex == 0 ? null : AppBar(
-        title: Text(_appBarTitles[_selectedIndex]),
-        actions: [
-          IconButton(icon: const Icon(Icons.logout), onPressed: _logout, tooltip: 'Cerrar Sesión')
-        ],
-      ),
-      drawer: _isFullScreenVideo && _selectedIndex == 0 ? null : BarraLateral(
-        selectedIndex: _selectedIndex,
-        onItemSelected: _onSelectItem,
-        // Necesitarás modificar BarraLateral para incluir el ítem de "Contactos de Emergencia"
-        // y para que onItemSelected pueda manejar el nuevo índice.
-      ),
+      appBar:
+          _isFullScreenVideo && _selectedIndex == 0
+              ? null
+              : AppBar(
+                title: Text(_appBarTitles[_selectedIndex]),
+                actions: [
+                  IconButton(
+                    icon: const Icon(Icons.logout),
+                    onPressed: _logout,
+                    tooltip: 'Cerrar Sesión',
+                  ),
+                ],
+              ),
+      drawer:
+          _isFullScreenVideo && _selectedIndex == 0
+              ? null
+              : BarraLateral(
+                selectedIndex: _selectedIndex,
+                onItemSelected: _onSelectItem,
+                onLogout: _logout, // Pass the logout function
+              ),
       body: IndexedStack(
         index: _selectedIndex,
         children: _buildWidgetOptions(),
