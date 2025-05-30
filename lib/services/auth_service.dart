@@ -16,7 +16,7 @@ class AuthService {
   
   // ✅ CORRECCIÓN: Configuración más robusta de GoogleSignIn
   final GoogleSignIn _googleSignIn = GoogleSignIn(
-    serverClientId: '646247150307-n0nnp29b4f5ubln8nnr5j04vhuv4tob4.apps.googleusercontent.com',
+    serverClientId: '201347486772-8p9sckk6gobojtd38nf83jsjtkbhpgv0.apps.googleusercontent.com',
     scopes: ['email', 'profile'],
     signInOption: SignInOption.standard, // ✅ Agregar esta línea
   );
