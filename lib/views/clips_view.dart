@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
-import 'package:flutter_vlc_player/flutter_vlc_player.dart';
+import 'package:better_player_plus/better_player_plus.dart';
 import 'package:flutter/services.dart';
 
 // --- Modelo de Datos ---
@@ -14,7 +14,7 @@ class VideoInfo {
   final String thumbnailLink;
   final DateTime createdTime;
 
-  const VideoInfo({ // Added const constructor
+  const VideoInfo({
     required this.id,
     required this.name,
     required this.thumbnailLink,
@@ -31,7 +31,7 @@ class VideoInfo {
   }
 }
 
-// --- Pantalla del Reproductor con VLC ---
+// --- Pantalla del Reproductor con BetterPlayer ---
 class VideoPlayerScreen extends StatefulWidget {
   final String videoUrl;
   final String videoName;
@@ -47,219 +47,68 @@ class VideoPlayerScreen extends StatefulWidget {
 }
 
 class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
-  late VlcPlayerController _controller;
-  bool _isPlaying = false;
-  bool _showControls = true;
-  bool _isFullScreen = false;
-  bool _isBuffering = true;
-  bool _isInitialized = false;
-  double _aspectRatio = 16 / 9;
-  Timer? _controlsTimer;
+  late BetterPlayerController _controller;
+  final bool _isFullScreen = false;
 
   @override
   void initState() {
     super.initState();
-    _controller = VlcPlayerController.network(
+
+    BetterPlayerDataSource dataSource = BetterPlayerDataSource(
+      BetterPlayerDataSourceType.network,
       widget.videoUrl,
-      hwAcc: HwAcc.full,
-      autoPlay: false,
-      options: VlcPlayerOptions(),
+      videoFormat: BetterPlayerVideoFormat.other,
     );
-    _controller.addListener(_vlcListener);
-     Future.delayed(const Duration(milliseconds: 100), () {
-       if (mounted && !_controller.value.isPlaying) {
-         _controller.play();
-       }
-     });
-    _scheduleControlsHide();
-  }
 
-  void _vlcListener() {
-    if (!mounted) return;
-    final value = _controller.value;
-
-    final isPlayingNow = value.isPlaying;
-    final isBufferingNow = value.isBuffering;
-    final isInitializedNow = value.isInitialized;
-    final aspectRatioNow = value.aspectRatio > 0 ? value.aspectRatio : 16 / 9;
-
-    bool needsSetState = false;
-    if (isPlayingNow != _isPlaying) { _isPlaying = isPlayingNow; needsSetState = true; }
-    if (isBufferingNow != _isBuffering) { _isBuffering = isBufferingNow; needsSetState = true; }
-    if (isInitializedNow != _isInitialized) { _isInitialized = isInitializedNow; needsSetState = true; }
-    if ((aspectRatioNow - _aspectRatio).abs() > 0.01) { _aspectRatio = aspectRatioNow; needsSetState = true; }
-
-    if (value.hasError) {
-        if (mounted) {
-             ScaffoldMessenger.of(context).showSnackBar(
-                 SnackBar(content: Text("Error: ${value.errorDescription}"))
-             );
-        }
-    }
-     if (needsSetState) setState(() {});
-  }
-
-  void _togglePlayPause() {
-    if (!_isInitialized) return;
-    if (_controller.value.isPlaying) { _controller.pause(); }
-    else { _controller.play(); }
-    // No need for setState here as the listener will handle it
-    _showAndHideControls();
-  }
-
-  void _toggleFullScreenPlayer() async {
-     final newFullScreenState = !_isFullScreen;
-     setState(() { _isFullScreen = newFullScreenState; });
-
-     if (_isFullScreen) {
-        await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-        await SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
-     } else {
-         await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-         await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-     }
-     // No need for setState here as the orientation change rebuilds
-      _showAndHideControls();
-  }
-
-  void _showAndHideControls() {
-    if (!mounted) return;
-    setState(() { _showControls = true; });
-    _scheduleControlsHide();
-  }
-
-  void _scheduleControlsHide() {
-     _controlsTimer?.cancel();
-     _controlsTimer = Timer(const Duration(seconds: 4), () {
-        if (mounted && _isPlaying && _showControls) {
-           if(mounted) setState(() { _showControls = false; });
-        }
-     });
+    _controller = BetterPlayerController(
+      BetterPlayerConfiguration(
+        autoPlay: true,
+        aspectRatio: 16 / 9,
+        fit: BoxFit.contain,
+        allowedScreenSleep: false,
+        controlsConfiguration: BetterPlayerControlsConfiguration(
+          enableFullscreen: true,
+          enablePlayPause: true,
+          enableProgressText: true,
+          enableProgressBar: true,
+        ),
+        fullScreenByDefault: false,
+        autoDetectFullscreenDeviceOrientation: true,
+        autoDetectFullscreenAspectRatio: true,
+      ),
+      betterPlayerDataSource: dataSource,
+    );
   }
 
   @override
   void dispose() {
-     if (_isFullScreen) {
-         SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-         SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-     }
-    _controlsTimer?.cancel();
-    _controller.removeListener(_vlcListener);
-    _controller.stopRendererScanning();
+    if (_isFullScreen) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    }
     _controller.dispose();
     super.dispose();
-  }
-
-  Widget _buildPlayerControls() {
-     if(!_isInitialized) return const SizedBox.shrink();
-     const controlIconSize = 28.0;
-     const controlIconColor = Colors.white;
-
-     return IgnorePointer(
-       ignoring: !_showControls,
-       child: AnimatedOpacity(
-          opacity: _showControls ? 1.0 : 0.0,
-          duration: const Duration(milliseconds: 300),
-          child: Container(
-            decoration: BoxDecoration(
-                gradient: LinearGradient(
-                    begin: Alignment.bottomCenter, end: Alignment.topCenter,
-                    colors: [Colors.black.withAlpha((255 * 0.6).round()), Colors.transparent],
-                    stops: const [0.0, 0.8]
-                ),
-            ),
-            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
-            child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ValueListenableBuilder<VlcPlayerValue>(
-                    valueListenable: _controller,
-                    builder: (context, value, child) {
-                      final durationMs = value.duration.inMilliseconds;
-                      final positionMs = value.position.inMilliseconds;
-                      double progress = 0.0;
-                      if (durationMs > 0 && positionMs >= 0 && positionMs <= durationMs) {
-                        progress = positionMs / durationMs;
-                      } else if (positionMs > durationMs && durationMs > 0) {
-                         progress = 1.0;
-                      }
-                      return LinearProgressIndicator(
-                        value: progress,
-                        valueColor: const AlwaysStoppedAnimation<Color>(Colors.red),
-                        backgroundColor: Colors.white.withAlpha(100),
-                        minHeight: 3,
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 10.0),
-                  Row(
-                    children: [
-                        IconButton(
-                            icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow, size: controlIconSize, color: controlIconColor),
-                            padding: EdgeInsets.zero, constraints: const BoxConstraints(), onPressed: _togglePlayPause,
-                        ),
-                        const SizedBox(width: 16),
-                        ValueListenableBuilder<VlcPlayerValue>(
-                            valueListenable: _controller,
-                            builder: (context, value, child) {
-                                return Text(
-                                    '${_formatDuration(value.position)} / ${_formatDuration(value.duration)}',
-                                    style: const TextStyle(color: Colors.white, fontSize: 12),
-                                );
-                            },
-                        ),
-                        const Spacer(),
-                        IconButton(
-                            icon: Icon(_isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen, size: controlIconSize, color: controlIconColor),
-                            padding: EdgeInsets.zero, constraints: const BoxConstraints(), onPressed: _toggleFullScreenPlayer,
-                        ),
-                    ],
-                  ),
-                ],
-            ),
-          ),
-       ),
-     );
-  }
-
-  String _formatDuration(Duration duration) {
-    if (duration.inMilliseconds < 0) return '00:00';
-    String twoDigits(int n) => n.toString().padLeft(2, "0");
-    final hours = twoDigits(duration.inHours);
-    final minutes = twoDigits(duration.inMinutes.remainder(60));
-    final seconds = twoDigits(duration.inSeconds.remainder(60));
-    return [ if (duration.inHours > 0) hours, minutes, seconds ].join(':');
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: _isFullScreen ? null : AppBar(
-          title: Text(widget.videoName, style: const TextStyle(fontSize: 16)),
-          backgroundColor: Colors.black.withAlpha((255 * 0.5).round()),
-          elevation: 0,
-          foregroundColor: Colors.white, // Ensure icons/text are white
-      ),
-      body: GestureDetector(
-        onTap: _showAndHideControls,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            VlcPlayer(
-              controller: _controller,
-              aspectRatio: _aspectRatio,
-              placeholder: const Center(child: CircularProgressIndicator()),
+      appBar: _isFullScreen
+          ? null
+          : AppBar(
+              title: Text(widget.videoName, style: const TextStyle(fontSize: 16)),
+              backgroundColor: Colors.black.withAlpha((255 * 0.5).round()),
+              elevation: 0,
+              foregroundColor: Colors.white,
             ),
-             Positioned.fill(
-               child: Align(
-                  alignment: Alignment.bottomCenter,
-                  child: _buildPlayerControls()
-                )
-             ),
-             if (_isBuffering && !_controller.value.hasError)
-               const Center(child: CircularProgressIndicator(color: Colors.white70)),
-          ],
+      body: GestureDetector(
+        onTap: () {},
+        child: Center(
+          child: AspectRatio(
+            aspectRatio: 16 / 9,
+            child: BetterPlayer(controller: _controller),
+          ),
         ),
       ),
     );
@@ -346,14 +195,14 @@ class _ClipsViewState extends State<ClipsView> with AutomaticKeepAliveClientMixi
       return const Center(child: Text('No se encontraron videos.'));
     }
     return GridView.builder(
-      key: ValueKey(_sortOrder), // Add key to force rebuild on sort change if needed
+      key: ValueKey(_sortOrder),
       padding: const EdgeInsets.all(_gridSpacing),
       gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
         maxCrossAxisExtent: _gridMaxExtent, childAspectRatio: _gridAspectRatio,
         crossAxisSpacing: _gridSpacing, mainAxisSpacing: _gridSpacing,
       ),
       itemCount: _videos.length,
-      itemBuilder: (context, index) => _VideoGridItem( // Use extracted widget
+      itemBuilder: (context, index) => _VideoGridItem(
         video: _videos[index],
         onTap: _playVideo,
         formatDate: _formatDate,
@@ -417,7 +266,7 @@ class _ClipsViewState extends State<ClipsView> with AutomaticKeepAliveClientMixi
   }
 }
 
-// --- Widget Interno para el Item de la Cuadrícula --- (Optimización)
+// --- Widget Interno para el Item de la Cuadrícula ---
 class _VideoGridItem extends StatelessWidget {
   final VideoInfo video;
   final Function(VideoInfo) onTap;

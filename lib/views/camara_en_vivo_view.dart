@@ -4,6 +4,7 @@ import 'package:video_player/video_player.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:http/http.dart' as http;
 
 class CamaraEnVivoView extends StatefulWidget {
   final ValueChanged<bool> onFullScreenToggle;
@@ -104,41 +105,87 @@ class _CamaraEnVivoViewState extends State<CamaraEnVivoView> with AutomaticKeepA
     }
  }
 
-  Future<void> _startPlayer() async {
-    if (_controller != null || _isLoading || !mounted) return;
+// En CamaraEnVivoView, actualiza _startPlayer
+Future<void> _startPlayer() async {
+  if (_controller != null || _isLoading || !mounted) return;
 
-    setState(() {
-      _isLoading = true;
-      _hasError = false;
-      _isRetrying = false;
-    });
-    _retryTimer?.cancel();
+  setState(() {
+    _isLoading = true;
+    _hasError = false;
+    _isRetrying = false;
+  });
+  _retryTimer?.cancel();
 
+  try {
+    print('🎥 Intentando conectar a: $videoUrl');
+    
+    // Verificar conectividad de red primero
+    try {
+      final response = await http.head(Uri.parse(videoUrl)).timeout(
+        const Duration(seconds: 10),
+      );
+      print('📡 Respuesta del servidor: ${response.statusCode}');
+      
+      if (response.statusCode != 200) {
+        throw Exception('Servidor no disponible: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('❌ Error de conectividad: $e');
+      throw Exception('No se puede conectar al servidor de video');
+    }
+    
     _controller = VideoPlayerController.networkUrl(
       Uri.parse(videoUrl),
-      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+      videoPlayerOptions: VideoPlayerOptions(
+        mixWithOthers: true,
+        allowBackgroundPlayback: false,
+      ),
+      httpHeaders: {
+        'User-Agent': 'FlutterApp/1.0',
+        'Accept': '*/*',
+        'Connection': 'keep-alive',
+      },
     );
 
     _initializeVideoPlayerFuture = _controller!.initialize();
-
-    try {
-      await _initializeVideoPlayerFuture;
-      if (!mounted || _controller == null) return;
-      _controller!.addListener(_videoListener);
-      _controller!.setLooping(true);
-      _controller!.setVolume(_isMuted ? 0.0 : 1.0);
-      await _controller!.play();
-      if (mounted) {
-        setState(() { _isLoading = false; _isPlaying = true; });
-      }
-      _scheduleControlsHide();
-    } catch (error) {
-      if (mounted) {
-        setState(() { _isLoading = false; _hasError = true; });
-        _scheduleRetry();
-      }
+    
+    // Timeout para la inicialización
+    await _initializeVideoPlayerFuture!.timeout(
+      const Duration(seconds: 30),
+      onTimeout: () {
+        throw Exception('Timeout al inicializar video');
+      },
+    );
+    
+    if (!mounted || _controller == null) return;
+    
+    print('✅ Video inicializado correctamente');
+    _controller!.addListener(_videoListener);
+    _controller!.setLooping(true);
+    _controller!.setVolume(_isMuted ? 0.0 : 1.0);
+    
+    await _controller!.play();
+    
+    if (mounted) {
+      setState(() { 
+        _isLoading = false; 
+        _isPlaying = true; 
+        _hasError = false;
+      });
     }
- }
+    _scheduleControlsHide();
+    
+  } catch (error) {
+    print('❌ Error al inicializar video: $error');
+    if (mounted) {
+      setState(() { 
+        _isLoading = false; 
+        _hasError = true; 
+      });
+      _scheduleRetry();
+    }
+  }
+}
 
   Future<void> _stopPlayer() async {
       _retryTimer?.cancel();

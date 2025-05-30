@@ -116,8 +116,37 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  void _logout() async {
+  // En HomePage, mejora la función _logout
+// En HomePage, mejora la función _logout
+void _logout() async {
+  print('🔄 Iniciando proceso de logout desde HomePage...');
+  
+  try {
+    // Mostrar indicador de carga
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+    
+    // Ejecutar logout
     await widget.authService.logout();
+    
+    // Cerrar diálogo de carga
+    if (mounted && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+    
+    // Verificar que el logout fue exitoso
+    final stillLoggedIn = await widget.authService.isLoggedIn();
+    if (stillLoggedIn) {
+      print('⚠️ Usuario aún aparece como logueado, forzando logout');
+      await widget.authService.storage.deleteAll();
+    }
+    
+    // Navegar a login
     if (mounted) {
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
@@ -126,7 +155,27 @@ class _HomePageState extends State<HomePage> {
         (Route<dynamic> route) => false,
       );
     }
+    
+    print('✅ Logout completado exitosamente');
+  } catch (e) {
+    print('❌ Error durante logout: $e');
+    
+    // Cerrar diálogo si está abierto
+    if (mounted && Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    }
+    
+    // Mostrar error al usuario
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error al cerrar sesión: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
+}
 
   @override
   Widget build(BuildContext context) {
@@ -136,13 +185,6 @@ class _HomePageState extends State<HomePage> {
               ? null
               : AppBar(
                 title: Text(_appBarTitles[_selectedIndex]),
-                actions: [
-                  IconButton(
-                    icon: const Icon(Icons.logout),
-                    onPressed: _logout,
-                    tooltip: 'Cerrar Sesión',
-                  ),
-                ],
               ),
       drawer:
           _isFullScreenVideo && _selectedIndex == 0

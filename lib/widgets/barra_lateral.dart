@@ -71,8 +71,13 @@ class BarraLateral extends StatelessWidget {
               style: TextStyle(color: Colors.red),
             ),
             onTap: () {
-              Navigator.of(context).pop(); // Close drawer first
-              onLogout?.call(); // Call logout function
+              print('🔄 Botón de logout presionado');
+              Navigator.of(context).pop(); // Cerrar el drawer primero
+              if (onLogout != null) {
+                onLogout!(); // Llamar a la función de logout
+              } else {
+                print('⚠️ Función onLogout es null');
+              }
             },
           ),
           const SizedBox(height: 16), // Bottom padding

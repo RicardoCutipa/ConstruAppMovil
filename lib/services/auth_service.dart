@@ -12,6 +12,7 @@ class AuthService {
   final String _flutterAppCallbackScheme = "monitoreoapp";
 
   final _storage = const FlutterSecureStorage();
+  FlutterSecureStorage get storage => _storage; 
   
   // ✅ CORRECCIÓN: Configuración más robusta de GoogleSignIn
   final GoogleSignIn _googleSignIn = GoogleSignIn(
@@ -30,13 +31,39 @@ class AuthService {
   Future<void> deleteJwtToken() async => await _storage.delete(key: 'jwt_token');
 
   // ✅ CORRECCIÓN: Logout mejorado
-  Future<void> logout() async {
-    await deleteJwtToken();
-    try { 
-      await _googleSignIn.signOut();
-      await _googleSignIn.disconnect(); // ✅ Agregar disconnect
+Future<void> logout() async {
+    print('🔄 Iniciando logout...');
+    
+    try {
+      // 1. Eliminar token JWT PRIMERO
+      await deleteJwtToken();
+      print('✅ Token JWT eliminado');
+      
+      // 2. Verificar que se eliminó correctamente
+      final tokenCheck = await getJwtToken();
+      if (tokenCheck != null) {
+        print('⚠️ Token aún existe, intentando eliminar nuevamente');
+        await _storage.deleteAll(); // Eliminar todo el storage
+      }
+      
+      // 3. Cerrar sesión de Google
+      try {
+        final isSignedIn = await _googleSignIn.isSignedIn();
+        if (isSignedIn) {
+          print('🔄 Cerrando sesión de Google...');
+          await _googleSignIn.signOut();
+          await _googleSignIn.disconnect();
+          print('✅ Google Sign-Out completado');
+        }
+      } catch (e) {
+        print('⚠️ Error en Google Sign-Out: $e');
+      }
+      
+      print('✅ Logout completado');
     } catch (e) {
-      print('Error en Google Sign Out: $e');
+      print('❌ Error durante logout: $e');
+      // Forzar eliminación de storage en caso de error
+      await _storage.deleteAll();
     }
   }
 
