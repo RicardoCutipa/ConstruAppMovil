@@ -2,8 +2,10 @@ name: notificaciones
 description: "A new Flutter project."
 publish_to: 'none'
 version: 0.1.0
+#version: 0.1.0+1
 
 environment:
+  #sdk: '>=3.2.0 <4.0.0'
   sdk: ^3.7.2
 
 dependencies:
@@ -25,6 +27,7 @@ dependencies:
   better_player_plus: ^1.0.8
   flutter_svg: ^2.2.0
   google_fonts: ^6.2.1
+  audioplayers: ^5.2.1
 
 dev_dependencies:
   flutter_test:
