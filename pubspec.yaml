@@ -24,6 +24,7 @@ dependencies:
   app_links: ^6.4.0
   better_player_plus: ^1.0.8
   flutter_svg: ^2.2.0
+  google_fonts: ^6.2.1
 
 dev_dependencies:
   flutter_test:
