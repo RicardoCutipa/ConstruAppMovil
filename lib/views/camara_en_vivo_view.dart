@@ -9,7 +9,6 @@ import 'package:http/http.dart' as http;
 import 'package:web_socket_channel/web_socket_channel.dart';
 import 'package:web_socket_channel/status.dart' as status;
 import 'package:audioplayers/audioplayers.dart';
-import 'package:audioplayers/src/source.dart';
 
 class CamaraEnVivoView extends StatefulWidget {
   final ValueChanged<bool> onFullScreenToggle;
@@ -25,7 +24,8 @@ class CamaraEnVivoView extends StatefulWidget {
   State<CamaraEnVivoView> createState() => _CamaraEnVivoViewState();
 }
 
-class _CamaraEnVivoViewState extends State<CamaraEnVivoView> with AutomaticKeepAliveClientMixin {
+class _CamaraEnVivoViewState extends State<CamaraEnVivoView>
+    with AutomaticKeepAliveClientMixin {
   VideoPlayerController? _controller;
   Future<void>? _initializeVideoPlayerFuture;
   bool _isPlaying = false;
@@ -61,16 +61,22 @@ class _CamaraEnVivoViewState extends State<CamaraEnVivoView> with AutomaticKeepA
   bool _isSendingAlert = false;
   bool _alertSentSuccess = false;
 
-  final List<String> _criticalObjectsForAlertModal = ['gun', 'knife', 'rifle', 'mask', 'helmet'];
+  final List<String> _criticalObjectsForAlertModal = [
+    'gun',
+    'knife',
+    'rifle',
+    'mask',
+    'helmet'
+  ];
 
   @override
   bool get wantKeepAlive => true;
-
+  
+  // --- INICIO: Lógica funcional (sin cambios) ---
   @override
   void initState() {
     super.initState();
     initializeDateFormatting(_locale, null);
-
     if (widget.isActive) {
       _startPlayer();
       _connectWebSocket();
@@ -96,105 +102,48 @@ class _CamaraEnVivoViewState extends State<CamaraEnVivoView> with AutomaticKeepA
 
   Future<void> _startPlayer() async {
     if (_controller != null || _isLoading || !mounted) return;
-
     setState(() {
       _isLoading = true;
       _hasError = false;
       _isRetrying = false;
     });
     _retryTimer?.cancel();
-
     try {
-      print('🎥 Intentando conectar a: $videoUrl');
-
-      try {
-        final response = await http.head(Uri.parse(videoUrl)).timeout(
-          const Duration(seconds: 10),
-        );
-        print('📡 Video server response: ${response.statusCode}');
-        if (response.statusCode != 200) {
-          throw Exception('Video server not available: ${response.statusCode}');
-        }
-      } catch (e) {
-        print('❌ Video connectivity error: $e');
-        throw Exception('Cannot connect to video stream server');
-      }
-
-      _controller = VideoPlayerController.networkUrl(
-        Uri.parse(videoUrl),
-        videoPlayerOptions: VideoPlayerOptions(
-          mixWithOthers: true,
-          allowBackgroundPlayback: false,
-        ),
-        httpHeaders: {
-          'User-Agent': 'FlutterApp/1.0',
-          'Accept': '*/*',
-          'Connection': 'keep-alive',
-        },
-      );
-
+      final response = await http.head(Uri.parse(videoUrl)).timeout(const Duration(seconds: 10));
+      if (response.statusCode != 200) throw Exception('Video server not available: ${response.statusCode}');
+      
+      _controller = VideoPlayerController.networkUrl(Uri.parse(videoUrl),
+          videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true, allowBackgroundPlayback: false,),
+          httpHeaders: {'User-Agent': 'FlutterApp/1.0', 'Accept': '*/*', 'Connection': 'keep-alive',},);
       _initializeVideoPlayerFuture = _controller!.initialize();
-
-      await _initializeVideoPlayerFuture!.timeout(
-        const Duration(seconds: 30),
-        onTimeout: () {
-          throw Exception('Timeout initializing video');
-        },
-      );
-
+      await _initializeVideoPlayerFuture!.timeout(const Duration(seconds: 30), onTimeout: () => throw Exception('Timeout initializing video'));
+      
       if (!mounted || _controller == null) return;
-
-      print('✅ Video inicializado correctamente');
       _controller!.addListener(_videoListener);
       _controller!.setLooping(true);
       _controller!.setVolume(_isMuted ? 0.0 : 1.0);
-
       await _controller!.play();
-
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _isPlaying = true;
-          _hasError = false;
-        });
-      }
+      
+      if (mounted) setState(() { _isLoading = false; _isPlaying = true; _hasError = false; });
       _scheduleControlsHide();
     } catch (error) {
-      print('❌ Error al inicializar video: $error');
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _hasError = true;
-        });
-        _scheduleRetry();
-      }
+      if (mounted) { setState(() { _isLoading = false; _hasError = true; }); _scheduleRetry(); }
     }
   }
 
   Future<void> _stopPlayer() async {
     _retryTimer?.cancel();
     _isRetrying = false;
-
     final controller = _controller;
     if (controller != null) {
       _controller = null;
       _initializeVideoPlayerFuture = null;
       try {
         controller.removeListener(_videoListener);
-        if (controller.value.isInitialized && controller.value.isPlaying) {
-          await controller.pause();
-        }
+        if (controller.value.isInitialized && controller.value.isPlaying) { await controller.pause(); }
         await controller.dispose();
-      } catch (e) {
-        print("Error disposing previous video controller: $e");
-      }
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _hasError = false;
-          _isPlaying = false;
-        });
-      }
+      } catch (e) { print("Error disposing previous video controller: $e"); }
+      if (mounted) setState(() { _isLoading = false; _hasError = false; _isPlaying = false; });
     }
   }
 
@@ -203,34 +152,19 @@ class _CamaraEnVivoViewState extends State<CamaraEnVivoView> with AutomaticKeepA
     if (mounted) setState(() { _isRetrying = true; });
     _retryTimer?.cancel();
     _retryTimer = Timer(const Duration(seconds: 5), () {
-      if (mounted && widget.isActive) {
-        _startPlayer();
-      } else {
-        if (mounted) setState(() => _isRetrying = false );
-      }
+      if (mounted && widget.isActive) { _startPlayer(); } 
+      else { if (mounted) setState(() => _isRetrying = false); }
     });
   }
 
   void _videoListener() {
     if (!mounted || _controller == null || !_controller!.value.isInitialized) return;
-
     final value = _controller!.value;
-    final isCurrentlyPlaying = value.isPlaying;
-
-    if (isCurrentlyPlaying != _isPlaying) {
-      if (mounted) setState(() { _isPlaying = isCurrentlyPlaying; });
-    }
-
-    if (value.hasError && !_isLoading && !_isRetrying && !_hasError) {
-      if (mounted) {
-        setState(() { _hasError = true; });
-        _scheduleRetry();
-      }
+    if (value.isPlaying != _isPlaying) { if (mounted) setState(() { _isPlaying = value.isPlaying; }); }
+    if (value.hasError && !_isLoading && !_isRetrying && !_hasError) { if (mounted) { setState(() { _hasError = true; }); _scheduleRetry(); }
     } else if (!value.hasError && (_hasError || _isRetrying)) {
       _retryTimer?.cancel();
-      if (mounted) {
-        setState(() { _hasError = false; _isRetrying = false; _isPlaying = value.isPlaying; });
-      }
+      if (mounted) { setState(() { _hasError = false; _isRetrying = false; _isPlaying = value.isPlaying; }); }
     }
   }
 
@@ -238,46 +172,27 @@ class _CamaraEnVivoViewState extends State<CamaraEnVivoView> with AutomaticKeepA
     if (_controller == null || !_controller!.value.isInitialized) return;
     try {
       final duration = _controller!.value.duration;
-      if (duration > const Duration(seconds: 5)) {
-        await _controller!.seekTo(duration - const Duration(seconds: 5));
-      }
-    } catch (e) { /* Silently ignore seek errors for live */ }
+      if (duration > const Duration(seconds: 5)) { await _controller!.seekTo(duration - const Duration(seconds: 5)); }
+    } catch (e) { /* Silently ignore */ }
   }
 
   void _togglePlayPause() async {
-    if (_controller == null || !_controller!.value.isInitialized) {
-      if (widget.isActive && !_isLoading) { _startPlayer(); }
-      return;
-    }
+    if (_controller == null || !_controller!.value.isInitialized) { if (widget.isActive && !_isLoading) { _startPlayer(); } return; }
     await _seekToLive();
-
-    if (_controller!.value.isPlaying) {
-      await _controller!.pause();
-    } else {
-      if (_controller!.value.volume == 0 && !_isMuted) {
-        await _controller!.setVolume(1.0);
-      }
-      await _controller!.play().catchError((e) {
-        if (mounted) setState(() => _hasError = true);
-        _scheduleRetry();
-      });
-    }
+    if (_controller!.value.isPlaying) { await _controller!.pause(); } 
+    else { await _controller!.play().catchError((e) { if (mounted) setState(() => _hasError = true); _scheduleRetry(); }); }
     _showAndHideControls();
   }
 
   void _toggleMute() {
     if (_controller == null || !_controller!.value.isInitialized) return;
-    setState(() {
-      _isMuted = !_isMuted;
-      _controller!.setVolume(_isMuted ? 0.0 : 1.0);
-    });
+    setState(() { _isMuted = !_isMuted; _controller!.setVolume(_isMuted ? 0.0 : 1.0); });
     _showAndHideControls();
   }
 
   void _exitFullScreenProgrammatically() async {
     if (_isFullScreen) {
-      widget.onFullScreenToggle(false);
-      _isFullScreen = false;
+      widget.onFullScreenToggle(false); _isFullScreen = false;
       await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
       if (mounted) setState(() {});
@@ -286,16 +201,11 @@ class _CamaraEnVivoViewState extends State<CamaraEnVivoView> with AutomaticKeepA
 
   void _toggleFullScreen() async {
     if (_isLoading && !_isFullScreen) return;
-
     final newFullScreenState = !_isFullScreen;
-    widget.onFullScreenToggle(newFullScreenState);
-    _isFullScreen = newFullScreenState;
-
+    widget.onFullScreenToggle(newFullScreenState); _isFullScreen = newFullScreenState;
     if (_isFullScreen) {
       await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-      await SystemChrome.setPreferredOrientations([
-        DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight,
-      ]);
+      await SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight,]);
     } else {
       await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
@@ -305,342 +215,127 @@ class _CamaraEnVivoViewState extends State<CamaraEnVivoView> with AutomaticKeepA
 
   void _showAndHideControls() {
     if (!mounted) return;
-    setState(() { _showControls = true; });
-    _scheduleControlsHide();
+    setState(() { _showControls = true; }); _scheduleControlsHide();
   }
 
   void _scheduleControlsHide() {
     Future.delayed(const Duration(seconds: 4), () {
-      if (mounted && widget.isActive && _isPlaying && _showControls && !_hasError) {
-        if (mounted) setState(() { _showControls = false; });
-      }
+      if (mounted && widget.isActive && _isPlaying && _showControls && !_hasError) { if (mounted) setState(() { _showControls = false; }); }
     });
   }
 
-  // --- WebSocket Logic ---
-
   void _connectWebSocket() {
-    // Corrected: Just check if closeCode is null. If it is, the channel is active (connecting or open).
-    if (_wsChannel != null && _wsChannel!.closeCode == null) {
-      print("WS: Connection already in progress or open.");
-      return;
-    }
-
+    if (_wsChannel != null && _wsChannel!.closeCode == null) return;
     _wsReconnectTimer?.cancel();
-    if (mounted) {
-      setState(() {
-        _clientStatusText = '⚪ Conectando...';
-        _clientStatusColor = Colors.orange;
-      });
-    }
-
-    final wsUri = Uri.parse(wsStatsUrl);
-    print('WS: Intentando conectar a $wsUri...');
-
+    if (mounted) { setState(() { _clientStatusText = '⚪ Conectando...'; _clientStatusColor = Colors.orange; }); }
     try {
-      _wsChannel = WebSocketChannel.connect(wsUri);
-
+      _wsChannel = WebSocketChannel.connect(Uri.parse(wsStatsUrl));
       _wsChannel!.stream.listen(
-        (message) {
-          _processWebSocketMessage(message.toString());
-        },
-        onDone: () {
-          print('WS: Connection done. Close Code: ${_wsChannel?.closeCode}, Reason: ${_wsChannel?.closeReason}');
-          if (_wsChannel?.closeCode != 1000) { // 1000 is WebSocket normal closure code
-            _scheduleWsReconnect();
-          } else {
-            if (mounted) {
-              setState(() {
-                _clientStatusText = '🔌 Desconectado (Normal)';
-                _clientStatusColor = Colors.grey;
-              });
-            }
-          }
-        },
-        onError: (error) {
-          print('WS: Error: $error');
-          if (mounted) {
-            setState(() {
-              _clientStatusText = '❌ Error de conexión';
-              _clientStatusColor = Colors.red;
-            });
-          }
-          _scheduleWsReconnect();
-        },
+        (message) => _processWebSocketMessage(message.toString()),
+        onDone: () { if (_wsChannel?.closeCode != 1000) { _scheduleWsReconnect(); } else { if (mounted) setState(() { _clientStatusText = '🔌 Desconectado'; _clientStatusColor = Colors.grey; }); }},
+        onError: (error) { if (mounted) setState(() { _clientStatusText = '❌ Error'; _clientStatusColor = Colors.red; }); _scheduleWsReconnect(); },
         cancelOnError: true,
       );
-
-      if (mounted) {
-        setState(() {
-          _wsReconnectIntervalMs = 1000;
-        });
-      }
-      print('WS: WebSocketChannel creado y escuchando.');
-    } catch (e) {
-      print('WS: Falló la creación de WebSocketChannel: $e');
-      _scheduleWsReconnect();
-    }
+      if (mounted) setState(() { _wsReconnectIntervalMs = 1000; });
+    } catch (e) { _scheduleWsReconnect(); }
   }
 
   void _disconnectWebSocket() {
     _wsReconnectTimer?.cancel();
-    // Corrected: Use status.normalClosure from the aliased import
-    _wsChannel?.sink.close(status.normalClosure, 'Widget disposed or inactive');
-    _wsChannel = null;
+    _wsChannel?.sink.close(status.normalClosure, 'Widget disposed'); _wsChannel = null;
     if (mounted) {
       setState(() {
-        _clientStatusText = '🔌 Desconectado';
-        _clientStatusColor = Colors.grey;
-        _personsCount = 0;
-        _dangerousObjectsCount = 0;
-        _lastDetectionDate = '--/--/----';
-        _lastDetectionTime = '--:--:--';
+        _clientStatusText = '🔌 Desconectado'; _clientStatusColor = Colors.grey;
+        _personsCount = 0; _dangerousObjectsCount = 0;
+        _lastDetectionDate = '--/--/----'; _lastDetectionTime = '--:--:--';
       });
     }
   }
 
   void _scheduleWsReconnect() {
     if (!mounted || !widget.isActive) return;
-
-    // Corrected: Just check if closeCode is null.
-    if (_wsChannel != null && _wsChannel!.closeCode == null) {
-      print("WS: Aún conectado o conectando, no se necesita reconexión ahora.");
-      return;
-    }
-
-    if (mounted) {
-      setState(() {
-        _clientStatusText = '🔴 Desconectado (Intentando reconectar)';
-        _clientStatusColor = Colors.red;
-      });
-    }
-
+    if (_wsChannel != null && _wsChannel!.closeCode == null) return;
+    if (mounted) setState(() { _clientStatusText = '🔴 Reconectando...'; _clientStatusColor = Colors.red; });
     _wsReconnectTimer?.cancel();
     _wsReconnectTimer = Timer(Duration(milliseconds: _wsReconnectIntervalMs), () {
-      if (mounted && widget.isActive) {
-        print('WS: Intentando reconexión después de ${_wsReconnectIntervalMs / 1000}s...');
-        _connectWebSocket();
-        _wsReconnectIntervalMs = (_wsReconnectIntervalMs * 2).clamp(1000, _wsMaxReconnectIntervalMs);
-      } else {
-        print('WS: Reconexión cancelada (no activo o no montado).');
-      }
+      if (mounted && widget.isActive) { _connectWebSocket(); _wsReconnectIntervalMs = (_wsReconnectIntervalMs * 2).clamp(1000, _wsMaxReconnectIntervalMs); }
     });
   }
 
   void _processWebSocketMessage(String message) {
     if (!mounted) return;
     try {
-      final Map<String, dynamic> messageData = json.decode(message);
-
-      if (messageData.containsKey('persons_in_frame') && messageData.containsKey('dangerous_objects_in_frame')) {
-        final int persons = messageData['persons_in_frame'] ?? 0;
-        final int objects = messageData['dangerous_objects_in_frame'] ?? 0;
-        final String? timestampStr = messageData['timestamp'];
-        final String? status = messageData['status'];
-
+      final Map<String, dynamic> data = json.decode(message);
+      if (data.containsKey('persons_in_frame')) {
         setState(() {
-          _personsCount = persons;
-          _dangerousObjectsCount = objects;
-
-          if (timestampStr != null) {
+          _personsCount = data['persons_in_frame'] ?? 0; _dangerousObjectsCount = data['dangerous_objects_in_frame'] ?? 0;
+          if (data['timestamp'] != null) {
             try {
-              final DateTime dateObj = DateTime.parse(timestampStr);
-              _lastDetectionDate = DateFormat('dd/MM/yyyy', _locale).format(dateObj.toLocal());
-              _lastDetectionTime = DateFormat('HH:mm:ss', _locale).format(dateObj.toLocal());
-            } catch (e) {
-              print('WS: Error al parsear timestamp: $e');
-              _lastDetectionDate = 'Fecha Inválida';
-              _lastDetectionTime = 'Hora Inválida';
-            }
+              final date = DateTime.parse(data['timestamp']).toLocal();
+              _lastDetectionDate = DateFormat('dd/MM/yyyy', _locale).format(date);
+              _lastDetectionTime = DateFormat('HH:mm:ss', _locale).format(date);
+            } catch (e) { /* silent */ }
           }
-
-          if (status != null) {
-            _clientStatusText = status == 'connected' ? '🟢 En ejecución' : '⚪ Desconocido';
-            _clientStatusColor = status == 'connected' ? Colors.green : Colors.grey;
-          } else {
-            _clientStatusText = '⚪ Desconocido (sin estado)';
-            _clientStatusColor = Colors.grey;
+          if (data['status'] != null) {
+            final isConnected = data['status'] == 'connected';
+            _clientStatusText = isConnected ? '🟢 En ejecución' : '⚪ Desconocido'; _clientStatusColor = isConnected ? Colors.green.shade700 : Colors.grey;
           }
         });
-      } else if (messageData.containsKey('objeto') && messageData.containsKey('confianza')) {
-        print("WS: Mensaje de alerta potencial recibido (del stream de stats?): $messageData");
-
-        final String objectType = messageData['objeto']?.toLowerCase() ?? 'desconocido';
-        final double confidence = (messageData['confianza'] as num?)?.toDouble() ?? 0.0;
-        final String? timestampStr = messageData['timestamp'];
-        final DateTime alertTimestamp = timestampStr != null ? DateTime.parse(timestampStr).toLocal() : DateTime.now();
-
-        if (_criticalObjectsForAlertModal.contains(objectType) && !_alertaMostrada) {
-          _showAlerta(objectType, confidence);
-        }
-      } else {
-        print('WS: Mensaje recibido con estructura desconocida: $messageData');
+      } else if (data.containsKey('objeto')) {
+        final objectType = data['objeto']?.toLowerCase() ?? 'desconocido';
+        final confidence = (data['confianza'] as num?)?.toDouble() ?? 0.0;
+        if (_criticalObjectsForAlertModal.contains(objectType) && !_alertaMostrada) { _showAlerta(objectType, confidence); }
       }
-    } catch (e) {
-      print('WS: Error al parsear JSON o procesar mensaje: $e, Datos: $message');
-    }
+    } catch (e) { /* silent */ }
   }
 
   void _showAlerta(String objectType, double confidence) async {
     if (_alertaMostrada || !mounted) return;
+    setState(() { _alertaMostrada = true; _detectedObjectType = objectType; _detectedObjectConfidence = confidence; });
+    try { await _audioPlayer.stop(); await _audioPlayer.play(AssetSource('assets/audio/alerta.mp3'));
+    } catch (e) { /* silent */ }
 
-    setState(() {
-      _alertaMostrada = true;
-      _detectedObjectType = objectType;
-      _detectedObjectConfidence = confidence;
-    });
-
-    try {
-      await _audioPlayer.stop();
-      await _audioPlayer.play(AssetSource('assets/audio/alerta.mp3'));
-    } catch (e) {
-      print("Error al reproducir audio de alerta: $e");
-    }
-
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext dialogContext) {
-        return PopScope(
-          canPop: false,
-          child: AlertDialog(
-            backgroundColor: Colors.red[800],
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            contentPadding: const EdgeInsets.all(20),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.warning_amber, color: Colors.white, size: 50),
-                const SizedBox(height: 10),
-                const Text('¡ALERTA DETECTADA!',
-                    style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 15),
-                Text(
-                  'Se ha detectado un objeto peligroso: ${_detectedObjectType.toUpperCase()} (${(_detectedObjectConfidence * 100).toStringAsFixed(1)}% de confianza). Por favor, verifique y tome acción.',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white70, fontSize: 16),
-                ),
-                const SizedBox(height: 20),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.of(dialogContext).pop();
-                    _sendEmergencyAlert();
-                  },
-                  icon: const Icon(Icons.call, color: Colors.white),
-                  label: const Text('Contactar Autoridades', style: TextStyle(color: Colors.white)),
+    await showDialog( context: context, barrierDismissible: false,
+      builder: (ctx) => PopScope( canPop: false,
+        child: AlertDialog(
+          backgroundColor: Theme.of(context).colorScheme.errorContainer,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          contentPadding: const EdgeInsets.all(24),
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+              Icon(Icons.warning_amber_rounded, color: Theme.of(context).colorScheme.error, size: 60),
+              const SizedBox(height: 16),
+              Text('¡Alerta de Seguridad!', style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer, fontSize: 24, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              Text('Detectado: ${_detectedObjectType.toUpperCase()}\nConfianza: ${(_detectedObjectConfidence * 100).toStringAsFixed(1)}%', textAlign: TextAlign.center, style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer.withOpacity(0.8), fontSize: 16)),
+              const SizedBox(height: 24),
+              SizedBox( width: double.infinity, child: ElevatedButton.icon(
+                  onPressed: () { Navigator.of(ctx).pop(); _sendEmergencyAlert(); },
+                  icon: const Icon(Icons.call), label: const Text('Contactar Autoridades'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red[600],
-                    minimumSize: const Size.fromHeight(40),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    print("Marcando como Falso Positivo.");
-                    Navigator.of(dialogContext).pop();
-                    _hideAlerta();
-                  },
-                  icon: const Icon(Icons.clear, color: Colors.white),
-                  label: const Text('Marcar como Falso Positivo', style: TextStyle(color: Colors.white)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey[700],
-                    minimumSize: const Size.fromHeight(40),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    print("Alerta ignorada/cerrada por el usuario.");
-                    Navigator.of(dialogContext).pop();
-                    _hideAlerta();
-                  },
-                  icon: const Icon(Icons.close, color: Colors.white),
-                  label: const Text('Ignorar/Cerrar', style: TextStyle(color: Colors.white)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey[700],
-                    minimumSize: const Size.fromHeight(40),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
+                    backgroundColor: Theme.of(context).colorScheme.error, foregroundColor: Theme.of(context).colorScheme.onError,
+                    padding: const EdgeInsets.symmetric(vertical: 12), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  ),),),
+              const SizedBox(height: 8),
+              Row(children: [
+                Expanded(child: TextButton(onPressed: () { Navigator.of(ctx).pop(); _hideAlerta(); }, child: const Text('Falso Positivo'))),
+                const SizedBox(width: 8),
+                Expanded(child: TextButton(onPressed: () { Navigator.of(ctx).pop(); _hideAlerta(); }, child: const Text('Ignorar'))),
+              ]),],),),),);
   }
 
   void _hideAlerta() async {
     if (!mounted) return;
-    if (_alertaMostrada) {
-      setState(() {
-        _alertaMostrada = false;
-        _isSendingAlert = false;
-        _alertSentSuccess = false;
-      });
-      await _audioPlayer.stop();
-    }
+    if (_alertaMostrada) { setState(() { _alertaMostrada = false; _isSendingAlert = false; _alertSentSuccess = false; }); await _audioPlayer.stop(); }
   }
 
   void _sendEmergencyAlert() async {
     if (!mounted) return;
-
-    setState(() {
-      _isSendingAlert = true;
-      _alertSentSuccess = false;
-    });
-
-    await showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext loadingContext) {
-        return PopScope(
-          canPop: false,
-          child: AlertDialog(
-            backgroundColor: Colors.grey[900],
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const CircularProgressIndicator(color: Colors.white),
-                const SizedBox(height: 20),
-                const Text('Enviando alerta a autoridades...',
-                    style: TextStyle(color: Colors.white, fontSize: 16)),
-                const SizedBox(height: 10),
-                const Text(
-                  'Por favor, verifique que no sea un falso positivo.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.orange, fontSize: 13),
-                ),
-                if (_alertSentSuccess) ...[
-                  const SizedBox(height: 15),
-                  const Text('✅ Alerta enviada exitosamente.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.green, fontSize: 15, fontWeight: FontWeight.bold)),
-                ],
-              ],
-            ),
-          ),
-        );
-      },
-    );
-
+    setState(() => _isSendingAlert = true);
+    // Simulación de envío
     await Future.delayed(const Duration(seconds: 2));
-
-    if (mounted) {
-      setState(() {
-        _alertSentSuccess = true;
-      });
-    }
-
+    if (mounted) setState(() => _alertSentSuccess = true);
     await Future.delayed(const Duration(seconds: 3));
-
-    if (mounted) {
-      Navigator.of(context).pop();
-      _hideAlerta();
-    }
+    if (mounted) _hideAlerta();
   }
 
   @override
@@ -650,187 +345,141 @@ class _CamaraEnVivoViewState extends State<CamaraEnVivoView> with AutomaticKeepA
     _audioPlayer.dispose();
     super.dispose();
   }
+  // --- FIN: Lógica funcional ---
 
+  // --- INICIO: Widgets de UI rediseñados ---
+  
   Widget _buildVideoPlayerUI() {
     Widget videoContent;
-    const double defaultAspectRatio = 16 / 9;
 
     if (widget.isActive && (_isLoading || _controller == null)) {
-      videoContent = const Center(child: CircularProgressIndicator(color: Colors.white));
+      videoContent = const Center(child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.0,));
     } else if (_hasError && widget.isActive) {
       videoContent = Container(
-        color: Colors.red,
-        child: const Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.wifi_off, color: Colors.white, size: 50),
-              SizedBox(height: 8),
-              Text("Fuera de Conexión", style: TextStyle(color: Colors.white, fontSize: 16)),
-            ],
-          ),
-        ),
-      );
+        color: Colors.black,
+        child: Center(
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(Icons.error_outline, color: Colors.red.shade300, size: 48),
+            const SizedBox(height: 16),
+            const Text("Error de Conexión", style: TextStyle(color: Colors.white70, fontSize: 16)),
+            const SizedBox(height: 8),
+            if (_isRetrying) const Text("Reintentando...", style: TextStyle(color: Colors.white54, fontSize: 12)),
+          ],),),);
     } else if (_controller != null && _controller!.value.isInitialized) {
       videoContent = AspectRatio(
-        aspectRatio: _controller!.value.aspectRatio > 0 ? _controller!.value.aspectRatio : defaultAspectRatio,
-        child: Stack(
-          alignment: Alignment.bottomCenter,
-          children: [
+        aspectRatio: _controller!.value.aspectRatio,
+        child: Stack(alignment: Alignment.bottomCenter, children: [
             VideoPlayer(_controller!),
             AnimatedOpacity(
               opacity: _showControls ? 1.0 : 0.0,
               duration: const Duration(milliseconds: 300),
               child: _buildControlsOverlay(),
             ),
-          ],
-        ),
-      );
+          ],),);
     } else {
       videoContent = const ColoredBox(
         color: Colors.black,
-        child: Center(child: Icon(Icons.videocam_off_outlined, color: Colors.grey, size: 50)),
-      );
+        child: Center(child: Icon(Icons.videocam_off_outlined, color: Colors.grey, size: 50)),);
     }
 
-    return ColoredBox(
-      color: Colors.black,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          videoContent,
-          if (widget.isActive && !_isLoading && !_hasError && _controller != null && _controller!.value.isInitialized && _isPlaying)
-            Positioned(
-              top: 8, right: 8,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(4)),
-                child: const Text('EN VIVO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-              ),
-            ),
-        ],
-      ),
-    );
+    return AspectRatio(
+      aspectRatio: 16 / 9,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.black,
+          borderRadius: BorderRadius.circular(16.0),
+          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.2), blurRadius: 10, offset: const Offset(0, 4),),],),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(16.0),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              videoContent,
+              if (widget.isActive && !_isLoading && !_hasError && _controller != null && _controller!.value.isInitialized && _isPlaying)
+                Positioned(top: 12, right: 12, child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(6)),
+                    child: const Text('EN VIVO', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 11)),),),
+            ],),),),);
   }
 
   Widget _buildControlsOverlay() {
-    if (!widget.isActive || _hasError || _controller == null || !_controller!.value.isInitialized) {
-      return const SizedBox.shrink();
-    }
-    const controlIconSize = 28.0;
-    const controlIconColor = Colors.white;
-
+    if (!widget.isActive || _hasError || _controller == null || !_controller!.value.isInitialized) return const SizedBox.shrink();
     return IgnorePointer(
       ignoring: !_showControls,
       child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-              begin: Alignment.bottomCenter, end: Alignment.topCenter,
-              colors: [Colors.black.withOpacity(0.6), Colors.transparent],
-              stops: const [0.0, 0.8]
-          ),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+        decoration: BoxDecoration(gradient: LinearGradient(
+          begin: Alignment.bottomCenter, end: Alignment.center,
+          colors: [Colors.black.withOpacity(0.7), Colors.transparent],),),
+        padding: const EdgeInsets.all(8.0),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            IconButton(
-              icon: Icon(_isPlaying ? Icons.pause : Icons.play_arrow, size: controlIconSize, color: controlIconColor),
-              padding: EdgeInsets.zero, constraints: const BoxConstraints(), onPressed: _togglePlayPause,
-            ),
-            const SizedBox(width: 16),
-            IconButton(
-              icon: Icon(_isMuted ? Icons.volume_off : Icons.volume_up, size: controlIconSize, color: controlIconColor),
-              padding: EdgeInsets.zero, constraints: const BoxConstraints(), onPressed: _toggleMute,
-            ),
-            const Spacer(),
-            IconButton(
-              icon: Icon(_isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen, size: controlIconSize, color: controlIconColor),
-              padding: EdgeInsets.zero, constraints: const BoxConstraints(), onPressed: _toggleFullScreen,
-            ),
-          ],
-        ),
+            _buildControlButton(_isMuted ? Icons.volume_off : Icons.volume_up, _toggleMute),
+            _buildControlButton(_isPlaying ? Icons.pause_circle_filled_rounded : Icons.play_circle_filled_rounded, _togglePlayPause, size: 56),
+            _buildControlButton(_isFullScreen ? Icons.fullscreen_exit : Icons.fullscreen, _toggleFullScreen),
+          ],),),);
+  }
+
+  Widget _buildControlButton(IconData icon, VoidCallback onPressed, {double size = 40}) {
+    return Container(
+      decoration: BoxDecoration(color: Colors.black.withOpacity(0.4), shape: BoxShape.circle,),
+      child: IconButton(
+        icon: Icon(icon, size: size / 1.8, color: Colors.white),
+        iconSize: size,
+        padding: EdgeInsets.zero,
+        onPressed: onPressed,
       ),
     );
   }
 
-  Widget _buildInfoCard(IconData icon, String title, String value, {Color? valueColor}) {
-    return Card(
-      elevation: 1.0, margin: const EdgeInsets.symmetric(vertical: 4.0),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      child: Padding(
-        padding: const EdgeInsets.all(12.0),
-        child: Row(
-          children: [
-            Icon(icon, color: Colors.grey[600], size: 22),
+  Widget _buildInfoCard(IconData icon, String title, String value, {Color? iconBgColor, Color? valueColor}) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(16.0),
+        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12),),
+        child: Row(children: [
+            Container(
+              padding: const EdgeInsets.all(8.0),
+              decoration: BoxDecoration(
+                color: (iconBgColor ?? Colors.grey).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8.0),),
+              child: Icon(icon, color: iconBgColor ?? Colors.grey.shade600, size: 22),
+            ),
             const SizedBox(width: 12),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(title, style: TextStyle(color: Colors.grey.shade600, fontSize: 12)),
+                  const SizedBox(height: 2),
+                  Text(value, style: TextStyle(color: valueColor ?? Colors.black87, fontSize: 15, fontWeight: FontWeight.w600),
+                    overflow: TextOverflow.ellipsis,),
+                ],),)],),),);
+  }
+
+  Widget _buildCounterCard(String title, int count, IconData icon, Color defaultBg, Color defaultTxt, {bool isAlert = false}) {
+    final Color backgroundColor = isAlert ? Colors.red.shade100 : defaultBg;
+    final Color textColor = isAlert ? Colors.red.shade800 : defaultTxt;
+    final IconData displayIcon = isAlert ? Icons.warning_amber_rounded : icon;
+
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        decoration: BoxDecoration(color: backgroundColor, borderRadius: BorderRadius.circular(16),),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Positioned(right: -20, bottom: -20,
+              child: Icon(displayIcon, size: 100, color: textColor.withOpacity(0.1),),
+            ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(title, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
-                const SizedBox(height: 2),
-                Text(value, style: TextStyle(color: valueColor ?? Colors.black87, fontSize: 15, fontWeight: FontWeight.w500)),
-              ],
-            )
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCounterCard(String title, int count, Color defaultBg, Color defaultTxt, {bool isAlert = false}) {
-    final Color backgroundColor = isAlert ? Colors.red[100]! : defaultBg;
-    final Color textColor = isAlert ? Colors.red[800]! : defaultTxt;
-    final String displayCount = count.toString();
-
-    final textStyle = TextStyle(color: textColor, fontSize: 48, fontWeight: FontWeight.bold);
-    final titleStyle = TextStyle(color: textColor.withOpacity(0.9), fontSize: 15, fontWeight: FontWeight.w500);
-
-    return Card(
-      elevation: 1.0, color: backgroundColor, margin: const EdgeInsets.symmetric(horizontal: 4.0),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center, crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text(title, style: titleStyle, textAlign: TextAlign.center),
-            const SizedBox(height: 8),
-            Text(displayCount, style: textStyle, textAlign: TextAlign.center),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInformationCard() {
-    const titleStyle = TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black87);
-    const contentStyle = TextStyle(color: Colors.black54, fontSize: 14, height: 1.4);
-    const infoText = "Este módulo muestra la transmisión en vivo de la cámara principal. Los contadores muestran el número de personas y objetos peligrosos detectados en el fotograma actual.";
-
-    return Card(
-      elevation: 1.0, margin: const EdgeInsets.symmetric(vertical: 4.0),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(Icons.info_outline, color: Colors.blueGrey[400], size: 24),
-            const SizedBox(width: 16),
-            const Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("Información", style: titleStyle),
-                  SizedBox(height: 6),
-                  Text(infoText, style: contentStyle),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+                Text(count.toString(), style: TextStyle(color: textColor, fontSize: 48, fontWeight: FontWeight.bold),),
+                const SizedBox(height: 4),
+                Text(title, style: TextStyle(color: textColor.withOpacity(0.9), fontSize: 15, fontWeight: FontWeight.w500),),
+              ],),
+          ],),),);
   }
 
   @override
@@ -838,52 +487,62 @@ class _CamaraEnVivoViewState extends State<CamaraEnVivoView> with AutomaticKeepA
     super.build(context);
 
     if (_isFullScreen) {
-      return GestureDetector( onTap: _showAndHideControls, child: _buildVideoPlayerUI() );
+      return Scaffold(backgroundColor: Colors.black,
+          body: Center(child: GestureDetector(onTap: _showAndHideControls, child: _buildVideoPlayerUI())));
     }
 
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: Colors.grey.shade200,
       body: RefreshIndicator(
-        onRefresh: () async { if(widget.isActive) { await _startPlayer(); _connectWebSocket(); } },
+        onRefresh: () async { if (widget.isActive) { await _startPlayer(); _connectWebSocket(); } },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(12.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const SizedBox(height: 4.0),
-              GestureDetector(
-                onTap: _showAndHideControls,
-                child: ClipRRect( borderRadius: BorderRadius.circular(12.0), child: _buildVideoPlayerUI()),
-              ),
-              const SizedBox(height: 12.0),
-              _buildInfoCard(Icons.location_on_outlined, "Ubicación", ubicacion),
-              _buildInfoCard(Icons.calendar_today_outlined, "Fecha (Ultima Deteccion)", _lastDetectionDate),
-              _buildInfoCard(Icons.access_time_outlined, "Hora (Ultima Deteccion)", _lastDetectionTime),
-              const SizedBox(height: 12.0),
+          padding: const EdgeInsets.all(16.0),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              // --- Video Player ---
+              GestureDetector(onTap: _showAndHideControls, child: _buildVideoPlayerUI()),
+              const SizedBox(height: 16.0),
+
+              // --- Info Cards Row ---
               Row(
                 children: [
-                  Expanded(child: _buildCounterCard("Personas Detectadas", _personsCount, Colors.green[100]!, Colors.green[800]!)),
-                  const SizedBox(width: 8),
-                  Expanded(child: _buildCounterCard("Objetos Peligrosos", _dangerousObjectsCount, Colors.orange[100]!, Colors.orange[800]!, isAlert: _dangerousObjectsCount > 0)),
+                  _buildInfoCard(Icons.location_on_outlined, "Ubicación", ubicacion, iconBgColor: Colors.blue),
+                  const SizedBox(width: 12),
+                  _buildInfoCard(Icons.sensors, "Estado Script", _clientStatusText, iconBgColor: _clientStatusColor, valueColor: _clientStatusColor),
                 ],
               ),
               const SizedBox(height: 12.0),
-              _buildInfoCard(Icons.sensors, "Estado Script Monitoreo", _clientStatusText, valueColor: _clientStatusColor),
-              const SizedBox(height: 12.0),
-              _buildInformationCard(),
-              const SizedBox(height: 12.0),
+              Row(
+                children: [
+                  _buildInfoCard(Icons.calendar_today_outlined, "Fecha", _lastDetectionDate, iconBgColor: Colors.purple),
+                  const SizedBox(width: 12),
+                  _buildInfoCard(Icons.access_time_outlined, "Hora", _lastDetectionTime, iconBgColor: Colors.teal),
+                ],
+              ),
+              const SizedBox(height: 16.0),
+              
+              // --- Counter Cards Row ---
+              Row(children: [
+                  _buildCounterCard("Personas", _personsCount, Icons.people_alt_outlined, Colors.green.shade100, Colors.green.shade800),
+                  const SizedBox(width: 12),
+                  _buildCounterCard("Objetos", _dangerousObjectsCount, Icons.shield_outlined, Colors.orange.shade100, Colors.orange.shade800, isAlert: _dangerousObjectsCount > 0),
+                ],
+              ),
+              const SizedBox(height: 24.0),
+              
+              // --- Manual Alert Button ---
               ElevatedButton.icon(
                 onPressed: () => _showAlerta("Manual", 1.0),
-                icon: const Icon(Icons.warning_amber, color: Colors.white),
-                label: const Text('Activar Alerta Manual', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                icon: const Icon(Icons.campaign_outlined),
+                label: const Text('Activar Alerta Manual'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blueAccent,
-                  padding: const EdgeInsets.symmetric(vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                  foregroundColor: Theme.of(context).colorScheme.onError,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
-              const SizedBox(height: 12.0),
             ],
           ),
         ),

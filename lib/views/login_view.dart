@@ -36,7 +36,6 @@ class _LoginViewState extends State<LoginView> {
   @override
   void initState() {
     super.initState();
-    // Permite que google_fonts cargue fuentes en tiempo de ejecución si no están empaquetadas.
     GoogleFonts.config.allowRuntimeFetching = true;
     widget.authService.initAppLinks(_handleTokenReceivedAndNavigate);
   }
@@ -100,6 +99,7 @@ class _LoginViewState extends State<LoginView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // CAMBIO: Fondo principal oscuro para eliminar cualquier espacio en blanco.
       backgroundColor: const Color(0xFF020617),
       body: Column(
         children: [
@@ -149,7 +149,6 @@ class _AnimatedGradientBackgroundState extends State<_AnimatedGradientBackground
     _controller = AnimationController(vsync: this, duration: const Duration(seconds: 30))..repeat();
     final curve = CurvedAnimation(parent: _controller, curve: Curves.easeInOut);
 
-    // Replicando 'background-position' del CSS
     _positionAnim = TweenSequence<Offset>([
       TweenSequenceItem(tween: Tween(begin: const Offset(0.0, 0.5), end: const Offset(0.8, 0.3)), weight: 20),
       TweenSequenceItem(tween: Tween(begin: const Offset(0.8, 0.3), end: const Offset(0.6, 0.8)), weight: 20),
@@ -158,7 +157,6 @@ class _AnimatedGradientBackgroundState extends State<_AnimatedGradientBackground
       TweenSequenceItem(tween: Tween(begin: const Offset(0.9, 0.1), end: const Offset(0.0, 0.5)), weight: 20),
     ]).animate(curve);
 
-    // Replicando 'transform: scale' del CSS
     _scaleAnim = TweenSequence<double>([
       TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.01), weight: 20),
       TweenSequenceItem(tween: Tween(begin: 1.01, end: 1.005), weight: 20),
@@ -167,7 +165,6 @@ class _AnimatedGradientBackgroundState extends State<_AnimatedGradientBackground
       TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.0), weight: 20),
     ]).animate(curve);
 
-    // Replicando 'filter: brightness' del CSS
     _brightnessAnim = TweenSequence<double>([
       TweenSequenceItem(tween: Tween(begin: 0.9, end: 1.0), weight: 20),
       TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.95), weight: 20),
@@ -197,6 +194,7 @@ class _AnimatedGradientBackgroundState extends State<_AnimatedGradientBackground
                 gradient: LinearGradient(
                   begin: Alignment.topLeft, end: Alignment.bottomRight,
                   transform: _BackgroundGradientTransform(position: _positionAnim.value),
+                  // CAMBIO: Se restaura la paleta de colores oscuros original.
                   colors: const [
                     Color(0xFF0f1419), Color(0xFF1e2a3a), Color(0xFF2d3748), Color(0xFF3182ce), Color(0xFF2b77cb),
                     Color(0xFF2c5aa0), Color(0xFF1a365d), Color(0xFF2a4365), Color(0xFF1e2a3a), Color(0xFF0f1419),
@@ -221,13 +219,11 @@ class _MessageData {
 
 class _MessageRotator extends StatelessWidget {
   const _MessageRotator();
-
   static const List<_MessageData> _messages = [
     _MessageData(icon: Icons.shield, title: 'Seguridad Comunitaria', subtitle: 'Monitoreo y alerta de delitos en tiempo real para proteger tu entorno.'),
     _MessageData(icon: Icons.visibility, title: 'Vigilancia Inteligente', subtitle: 'Sistema avanzado de detección y prevención de incidentes urbanos.'),
     _MessageData(icon: Icons.group, title: 'Red Colaborativa', subtitle: 'Conecta con tu comunidad para crear un entorno más seguro para todos.'),
   ];
-
   @override
   Widget build(BuildContext context) {
     return Stack(
@@ -257,24 +253,17 @@ class _AnimatedMessageItemState extends State<_AnimatedMessageItem> with SingleT
   late final AnimationController _controller;
   late final Animation<double> _opacity;
   late final Animation<Offset> _position;
-
   @override
   void initState() {
     super.initState();
     _controller = AnimationController(vsync: this, duration: widget.totalDuration);
-    
-    Timer(widget.animationDelay, () {
-      if (mounted) _controller.repeat();
-    });
-
-    // Replicando los keyframes de la animación 'messageSequence'
+    Timer(widget.animationDelay, () { if (mounted) _controller.repeat(); });
     _opacity = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.0).chain(CurveTween(curve: Curves.easeOut)), weight: 5), // 0-5% in
-      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.0), weight: 25),                                        // 5-30% stay
-      TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.0).chain(CurveTween(curve: Curves.easeIn)), weight: 5),  // 30-35% out
-      TweenSequenceItem(tween: Tween(begin: 0.0, end: 0.0), weight: 65),                                        // 35-100% gone
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: 1.0).chain(CurveTween(curve: Curves.easeOut)), weight: 5),
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 1.0), weight: 25),
+      TweenSequenceItem(tween: Tween(begin: 1.0, end: 0.0).chain(CurveTween(curve: Curves.easeIn)), weight: 5),
+      TweenSequenceItem(tween: Tween(begin: 0.0, end: 0.0), weight: 65),
     ]).animate(_controller);
-
     _position = TweenSequence<Offset>([
       TweenSequenceItem(tween: Tween(begin: const Offset(0, -0.4), end: Offset.zero).chain(CurveTween(curve: Curves.easeOut)), weight: 5),
       TweenSequenceItem(tween: Tween(begin: Offset.zero, end: Offset.zero), weight: 25),
@@ -282,26 +271,14 @@ class _AnimatedMessageItemState extends State<_AnimatedMessageItem> with SingleT
       TweenSequenceItem(tween: Tween(begin: const Offset(0, -0.4), end: const Offset(0, -0.4)), weight: 65),
     ]).animate(_controller);
   }
-
   @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
+  void dispose() { _controller.dispose(); super.dispose(); }
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
       animation: _controller,
-      // El child se construye una sola vez para un rendimiento óptimo.
       child: _MessageContent(data: widget.data),
-      builder: (context, child) => FadeTransition(
-        opacity: _opacity,
-        child: SlideTransition(
-          position: _position,
-          child: child,
-        ),
-      ),
+      builder: (context, child) => FadeTransition(opacity: _opacity, child: SlideTransition(position: _position, child: child)),
     );
   }
 }
@@ -348,6 +325,7 @@ class _BottomSheet extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(32, 32, 32, 40),
       decoration: BoxDecoration(
+        // CAMBIO: Fondo oscuro para el panel de botones, como en la imagen de referencia.
         color: const Color(0xFF0F172A),
         borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
         boxShadow: [BoxShadow(color: Colors.black.withAlpha(89), blurRadius: 35, spreadRadius: -6, offset: const Offset(0, -12))]
@@ -376,6 +354,7 @@ class _LoginButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final style = TextButton.styleFrom(
+      // CAMBIO: Estilos de los botones para que funcionen sobre el fondo oscuro del BottomSheet.
       backgroundColor: isPrimary ? const Color(0xFF3182CE) : Colors.transparent,
       foregroundColor: isPrimary ? Colors.white : const Color(0xFF94a3b8),
       padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 30),
@@ -385,7 +364,6 @@ class _LoginButton extends StatelessWidget {
       ),
       shadowColor: isPrimary ? const Color(0xFF3182CE).withAlpha(115) : Colors.transparent,
       elevation: isPrimary ? 5 : 0,
-      splashFactory: isPrimary ? InkRipple.splashFactory : NoSplash.splashFactory,
     );
 
     return SizedBox(
