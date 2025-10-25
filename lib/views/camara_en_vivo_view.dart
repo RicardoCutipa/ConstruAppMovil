@@ -45,7 +45,7 @@ class _CamaraEnVivoViewState extends State<CamaraEnVivoView>
   Timer? _wsReconnectTimer;
   int _wsReconnectIntervalMs = 1000;
   static const int _wsMaxReconnectIntervalMs = 30000;
-  final String wsStatsUrl = 'wss://tunelvps.sytes.net/stats';
+  final String wsStatsUrl = 'wss://tunelvps.duckdns.org/stats';
 
   int _personsCount = 0;
   int _dangerousObjectsCount = 0;

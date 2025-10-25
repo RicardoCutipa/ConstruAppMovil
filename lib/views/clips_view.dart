@@ -128,7 +128,7 @@ class _ClipsViewState extends State<ClipsView> with AutomaticKeepAliveClientMixi
   bool _isLoading = true;
   String? _error;
   String _sortOrder = 'desc';
-  final String _apiBaseUrl = 'https://tunelvps.sytes.net/api';
+  final String _apiBaseUrl = 'https://tunelvps.duckdns.org/api';
   final String _locale = 'es_PE';
   static const _gridMaxExtent = 200.0;
   static const _gridAspectRatio = 3 / 4;
